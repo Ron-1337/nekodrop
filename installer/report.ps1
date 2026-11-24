@@ -49,15 +49,15 @@ $WifiChips = @{
   '8086:E440' = @('intel-be', 'Intel Wi-Fi 7 (CNVi)')
   '8086:E340' = @('intel-be', 'Intel Wi-Fi 7 (CNVi)')
   '8086:D340' = @('intel-be', 'Intel Wi-Fi 7 (CNVi)')
-  # Realtek (Linux rtw88/rtw89 device IDs). RTL8852CE is natively supported
-  # via nekodrop's built-in devourer backend (on-demand AirDrop).
+  # Realtek (Linux rtw88/rtw89 device IDs). RTL8852CE and RTL8852BE are natively
+  # supported via nekodrop's built-in devourer backend (on-demand AirDrop).
   '10EC:C852' = @('supported-rtl', 'Realtek RTL8852CE')
   # MediaTek MT7902: built-in mt76 port (nekodrop-radio-mt.exe, on-demand AirDrop).
   '14C3:7902' = @('supported-mtk', 'MediaTek MT7902')
   '10EC:8852' = @('rtl', 'Realtek RTL8852AE')
   '10EC:A85A' = @('rtl', 'Realtek RTL8852AE')
-  '10EC:B852' = @('rtl', 'Realtek RTL8852BE')
-  '10EC:B85B' = @('rtl', 'Realtek RTL8852BE')
+  '10EC:B852' = @('supported-rtl', 'Realtek RTL8852BE')
+  '10EC:B85B' = @('supported-rtl', 'Realtek RTL8852BE')
   '10EC:B851' = @('rtl', 'Realtek RTL8851BE')
   '10EC:8922' = @('rtl', 'Realtek RTL8922AE')
   '10EC:C822' = @('rtl', 'Realtek RTL8822CE')
@@ -98,11 +98,11 @@ $WifiChips = @{
 $WifiKinds = @{
   'supported'     = @('supported by nekodrop', '')
   'supported-mtk' = @('supported by nekodrop (on-demand AirDrop, built-in MT7902 backend)', 'Windows keeps Wi-Fi normally; nekodrop takes the card only during AirDrop transfers.')
-  'supported-rtl' = @('supported by nekodrop (on-demand AirDrop, built-in RTL8852CE backend)', 'Windows keeps Wi-Fi normally; nekodrop takes the card only during AirDrop transfers.')
+  'supported-rtl' = @('supported by nekodrop (on-demand AirDrop, built-in RTL8852CE/BE backend)', 'Windows keeps Wi-Fi normally; nekodrop takes the card only during AirDrop transfers.')
   'intel-fw'      = @('not supported: its firmware is not shipped upstream', 'nekodrop runs the Intel cards whose firmware ForbiddenItlwm ships (API 68); this one has none there.')
   'intel-be'      = @('not supported: Intel Wi-Fi 7, no upstream driver', 'ForbiddenItlwm, which nekodrop ports, has no driver for Wi-Fi 7 cards yet.')
   'intel-other'   = @('not supported: an Intel device ID nekodrop does not know', 'Please post this report in an issue: if upstream ships firmware for this card, its ID can be added.')
-  'rtl'           = @('not supported: Realtek', 'Among Realtek chips, nekodrop currently has built-in support for RTL8852CE (10EC:C852) only.')
+  'rtl'           = @('not supported: Realtek', 'Among Realtek chips, nekodrop currently has built-in support for RTL8852CE (10EC:C852) and RTL8852BE (10EC:B852/B85B) only.')
   'mtk'           = @('not supported: MediaTek', 'No user-mode Windows driver exists for MediaTek Wi-Fi yet.')
   'qcom'          = @('not supported: Qualcomm', 'No user-mode Windows driver exists for Qualcomm Wi-Fi yet.')
   'bcm'           = @('not supported: Broadcom', 'There is no open Windows driver path for Broadcom Wi-Fi.')
@@ -230,7 +230,9 @@ if ($SelfTest) {
     @('PCI\VEN_8086&DEV_1234&SUBSYS_00008086\4&1', 'intel-other', 'Intel 1234 (not in nekodrop''s table)'),
     @('PCI\VEN_10EC&DEV_C852&SUBSYS_C85210EC&REV_00\4&1&0&00E8', 'supported-rtl', 'Realtek RTL8852CE'),
     @('pci\ven_10ec&dev_c852&subsys_c85210ec', 'supported-rtl', 'Realtek RTL8852CE'),
-    @('PCI\VEN_10EC&DEV_B852&SUBSYS_B85217AA\4&1', 'rtl', 'Realtek RTL8852BE'),
+    @('PCI\VEN_10EC&DEV_B852&SUBSYS_B85217AA\4&1', 'supported-rtl', 'Realtek RTL8852BE'),
+    @('PCI\VEN_10EC&DEV_B85B&SUBSYS_B85B10EC\4&1', 'supported-rtl', 'Realtek RTL8852BE'),
+    @('PCI\VEN_10EC&DEV_8852&SUBSYS_885217AA\4&1', 'rtl', 'Realtek RTL8852AE'),
     @('PCI\VEN_10EC&DEV_ABCD&SUBSYS_000010EC', 'rtl', 'Realtek ABCD (not in nekodrop''s table)'),
     @('PCI\VEN_14C3&DEV_7922&SUBSYS_7922103C\4&1', 'mtk', 'MediaTek MT7922'),
     @('PCI\VEN_14C3&DEV_0616&SUBSYS_E0CD1A3B\4&1', 'mtk', 'MediaTek MT7922 (AMD RZ616)'),
@@ -424,7 +426,7 @@ $svcStart = Try-Get { (Get-CimInstance Win32_Service -Filter "Name='NekoDropServ
 $exe = Join-Path $app 'NekoDropService.exe'
 $version = Try-Get { (Get-Item $exe).VersionInfo.ProductVersion }
 $config = Try-Get { Get-Content (Join-Path $state 'service.json') -Raw | ConvertFrom-Json }
-$SupportedCardPattern = '^PCI\\(?:VEN_8086&DEV_(' + ($SupportedIntelIds -join '|') + ')|VEN_10EC&DEV_C852)(?=&|\\|$)'
+$SupportedCardPattern = '^PCI\\(?:VEN_8086&DEV_(' + ($SupportedIntelIds -join '|') + ')|VEN_10EC&DEV_(?:C852|B852|B85B)|VEN_14C3&DEV_7902)(?=&|\\|$)'
 # Every present device once: the supported card and the other wireless cards
 # below both come from it.
 $pnpAll = @(Try-Get { Get-PnpDevice -PresentOnly } | Where-Object { $_ })

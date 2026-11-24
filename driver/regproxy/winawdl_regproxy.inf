@@ -1,7 +1,8 @@
 ; SPDX-License-Identifier: MIT
 ; User-mode register proxy for the Wi-Fi cards nekodrop's radios drive:
 ; Intel AX201 and 9560-class on Qu/QuZ, AX200, and the AX210 family
-; (AX210/AX211/AX411), plus Realtek RTL8852CE (10EC:C852).
+; (AX210/AX211/AX411), plus Realtek RTL8852CE (10EC:C852) and RTL8852BE
+; (10EC:B852, 10EC:B85B), and MediaTek MT7902 (14C3:7902).
 ; Adapted from winawdl's RTL8852CE proxy. Matches only the generic device IDs
 ; (no SUBSYS), which rank below the vendors' own drivers, so adding it takes
 ; over nothing: NekoDropService (or scripts\take-card.ps1) binds it explicitly.
@@ -42,6 +43,8 @@ HKR,,Icon,,"-5"
 %DeviceDesc% = RegProxy, PCI\VEN_8086&DEV_54F0
 %DeviceDesc% = RegProxy, PCI\VEN_8086&DEV_7F70
 %DeviceDescRtl% = RegProxy, PCI\VEN_10EC&DEV_C852
+%DeviceDescRtl% = RegProxy, PCI\VEN_10EC&DEV_B852
+%DeviceDescRtl% = RegProxy, PCI\VEN_10EC&DEV_B85B
 %DeviceDescMtk% = RegProxy, PCI\VEN_14C3&DEV_7902
 
 [SourceDisksNames]
@@ -98,7 +101,7 @@ ServiceBinary      = %13%\winawdl_regproxy.dll
 Provider   = "winairdrop project"
 ClassName  = "winawdl user-space radios"
 DeviceDesc = "Intel Wi-Fi user-space register proxy (nekodrop)"
-DeviceDescRtl = "Realtek RTL8852CE user-space register proxy (nekodrop)"
+DeviceDescRtl = "Realtek RTL8852CE/BE user-space register proxy (nekodrop)"
 DeviceDescMtk = "MediaTek MT7902 user-space register proxy (nekodrop)"
 DiskName   = "winawdl register proxy"
 WudfRdDisplayName = "Windows Driver Foundation - User-mode Driver Framework Reflector"

@@ -39,8 +39,8 @@ nekodrop drives the Wi-Fi chip directly from user mode so Windows can speak Appl
 | Card / Family | PCI Device IDs | Modes | Status |
 |---|---|---|---|
 | **Realtek RTL8852CE** | `C852` | On-Demand (native Wi-Fi kept by Windows) | ⚠️ **Built-in, untested inside nekodrop** (ships native `nekodrop-radio-rtl.exe` from [winawdl](https://github.com/raph559/winawdl)/`devourer` with A-MPDU; compiled and offline-tested in CI, awaiting real-hardware confirmation inside nekodrop; Intel default behavior unchanged) |
-| **Realtek RTL8852BE / RTL8851BE** | `B852` `B85B` `B851` | On-Demand | 🚧 Planned right after RTL8852CE (leverages `OpenIPC/devourer` `KESTREL_8852B`) |
-| Realtek RTL8852AE / RTL8922AE | `8852` `8922` | On-Demand | 🗓️ Planned |
+| **Realtek RTL8852BE** | `B852` `B85B` | On-Demand (native Wi-Fi kept by Windows) | ⚠️ **Built-in, experimental bring-up** (32-bit DMA + single-BDRAM `KESTREL_8852B` PCIe path inside `nekodrop-radio-rtl.exe`; compiled and offline-tested in CI, awaiting hardware verification) |
+| Realtek RTL8851BE / RTL8852AE / RTL8922AE | `B851` `8852` `8922` | On-Demand | 🗓️ Planned |
 
 ---
 

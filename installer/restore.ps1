@@ -26,7 +26,7 @@ $ErrorActionPreference = 'Continue'
 # in step with iwxradio/src/cards.h, app/service/CardCatalog.cs,
 # driver/regproxy/winawdl_regproxy.inf, installer/report.ps1 and install.ps1.
 $SupportedIntelIds = @('43F0', 'A0F0', '02F0', '06F0', '34F0', '3DF0', '4DF0', '2723', '2725', '7A70', '7AF0', '51F0', '51F1', '54F0', '7F70')
-$KnownCatalogIds = @($SupportedIntelIds | ForEach-Object { "8086:$_" }) + @('10EC:C852')
+$KnownCatalogIds = @($SupportedIntelIds | ForEach-Object { "8086:$_" }) + @('10EC:C852', '10EC:B852', '10EC:B85B', '14C3:7902')
 $ProxyInfNames = @('winawdl_regproxy.inf', 'nekodrop-wlan.inf')
 $ProxyServices = @('WUDFRd', 'nekodrop-wlan')
 $ProxyProvider = 'winairdrop project'
@@ -288,6 +288,12 @@ if ($SelfTest) {
   )
   $pickedRtl = Resolve-RestoreTargetDevice $rtlDevs $pubProxy
   if (-not $pickedRtl -or $pickedRtl.InstanceId -notmatch 'DEV_C852') { $fail += 'Realtek 10EC:C852 not selected' }
+  $rtlBeDevs = @(
+    (Dev 'PCI\VEN_10EC&DEV_8125&SUBSYS_012310EC\4&1' 'rt25cx21x64' 'oem9.inf' 'Realtek'),
+    (Dev 'PCI\VEN_10EC&DEV_B852&SUBSYS_B85210EC\00E04CFFFE88520100' 'rtwlane602' 'oem22.inf' 'Realtek Semiconductor Corp.')
+  )
+  $pickedBe = Resolve-RestoreTargetDevice $rtlBeDevs $pubProxy
+  if (-not $pickedBe -or $pickedBe.InstanceId -notmatch 'DEV_B852') { $fail += 'Realtek 10EC:B852 not selected' }
   $rtlPkg = Select-VendorInfPackage @() $store '10EC' 'C:\Windows' { param($p) $false } { param($p) '' }
   if ($rtlPkg -ne 'C:\Windows\INF\oem21.inf') { $fail += "Realtek store fallback picked '$rtlPkg', want oem21.inf" }
   $intelOnlyStore = @((Drv 'oem11.inf' 'netwtw14.inf' 'Intel Corporation' 'Net' '08/15/2024 23.80.0.7'))

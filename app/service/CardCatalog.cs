@@ -103,8 +103,14 @@ public static class CardCatalog
         Intel("7F70", "AX210 / AX211 / AX411"),
         // Built-in on-demand backend (winawdl's devourer, nekodrop-radio-rtl.exe):
         // monitor and inject only (no station, so Concurrent runs OnDemand), and
-        // its registers sit in a 1 MiB BAR (>= 64 KiB).
+        // their registers sit in a 1 MiB BAR (>= 64 KiB).
         new AdapterProfile("10EC", "C852", "Realtek", "RTL8852CE", RadioBackendKind.Devourer,
+            new AdapterCapabilities(false, false, false, false, 0x10000),
+            ProxyInf, ProxyService, ProxyProvider, ["Realtek"], Active: true),
+        new AdapterProfile("10EC", "B852", "Realtek", "RTL8852BE", RadioBackendKind.Devourer,
+            new AdapterCapabilities(false, false, false, false, 0x10000),
+            ProxyInf, ProxyService, ProxyProvider, ["Realtek"], Active: true),
+        new AdapterProfile("10EC", "B85B", "Realtek", "RTL8852BE", RadioBackendKind.Devourer,
             new AdapterCapabilities(false, false, false, false, 0x10000),
             ProxyInf, ProxyService, ProxyProvider, ["Realtek"], Active: true),
         // MediaTek MT7902 (nekodrop-radio-mt.exe, ported from Linux mt76/mt7921):
@@ -193,6 +199,7 @@ public static class CardCatalog
         new("ax210", "Intel AX210 (discrete)", "8086", RadioBackendKind.Iwx, AdapterCapabilities.IntelDefault, IntelProviders),
         new("so", "Intel AX211 / AX411 (So, CNVi)", "8086", RadioBackendKind.Iwx, AdapterCapabilities.IntelDefault, IntelProviders),
         new("rtl8852ce", "Realtek RTL8852CE", "10EC", RadioBackendKind.Devourer, RealtekCaps, ["Realtek"]),
+        new("rtl8852be", "Realtek RTL8852BE", "10EC", RadioBackendKind.Devourer, RealtekCaps, ["Realtek"]),
         new("mt7902", "MediaTek MT7902", "14C3", RadioBackendKind.Mt76, MediaTekCaps, MediaTekProviders),
     ];
 
@@ -228,10 +235,11 @@ public static class CardCatalog
         void Check(bool ok, string what) { if (!ok) fail.Add(what); }
 
         // The 15 Intel IDs the service took before the catalog (Card.DeviceIds, 0.1.20)
-        // plus Realtek RTL8852CE (10EC:C852) and MediaTek MT7902 (14C3:7902) on-demand backends = 17 active profiles.
+        // plus Realtek RTL8852CE (10EC:C852), RTL8852BE (10EC:B852, 10EC:B85B),
+        // and MediaTek MT7902 (14C3:7902) on-demand backends = 19 active profiles.
         string[] intel = ["43F0", "A0F0", "02F0", "06F0", "34F0", "3DF0", "4DF0",
                           "2723", "2725", "7A70", "7AF0", "51F0", "51F1", "54F0", "7F70"];
-        Check(ActiveProfiles.Count == intel.Length + 2, $"{ActiveProfiles.Count} active profiles, expected {intel.Length + 2}");
+        Check(ActiveProfiles.Count == intel.Length + 4, $"{ActiveProfiles.Count} active profiles, expected {intel.Length + 4}");
         foreach (var dev in intel)
         {
             var id = $"PCI\\VEN_8086&DEV_{dev}&SUBSYS_00748086&REV_00\\3&11583659&0&A3";
@@ -280,6 +288,23 @@ public static class CardCatalog
             Check(IsVendorProviderMatch(r, "Realtek Semiconductor Corp."), "Realtek provider not matched");
             Check(!IsVendorProviderMatch(r, "Intel"), "Intel provider matched as Realtek's");
             Check(!IsVendorProviderMatch(r, "winairdrop project"), "proxy provider matched as Realtek's");
+        }
+
+        // Built-in Realtek RTL8852BE (10EC:B852, 10EC:B85B): active, Devourer backend, forced to on demand.
+        foreach (var dev in new[] { "B852", "B85B" })
+        {
+            var beId = $"PCI\\VEN_10EC&DEV_{dev}&SUBSYS_{dev}10EC&REV_00\\00E04CFFFE88520100";
+            var rb = MatchActive(beId);
+            if (rb is null) fail.Add($"10EC:{dev} is not active");
+            else
+            {
+                Check(Classify(beId) == rb, $"10EC:{dev} Classify and MatchActive disagree");
+                Check(rb.HardwareId == $"PCI\\VEN_10EC&DEV_{dev}", $"10EC:{dev} hardware ID {rb.HardwareId}");
+                Check(rb.VendorName == "Realtek" && rb.Family == "RTL8852BE" && rb.Backend == RadioBackendKind.Devourer,
+                      $"10EC:{dev} vendor/family/backend");
+                Check(EffectiveMode(NetMode.Concurrent, rb.Capabilities) == NetMode.OnDemand,
+                      $"10EC:{dev} Concurrent not forced to OnDemand");
+            }
         }
 
         // Radio launch planning for Intel (Iwx) and Realtek (Devourer).
@@ -340,6 +365,8 @@ public static class CardCatalog
         }
         var mr = ManualProfile("PCI\\VEN_10EC&DEV_C852", "rtl8852ce");
         Check(mr is { Backend: RadioBackendKind.Devourer, RadioFamily: null }, "manual rtl8852ce profile");
+        var mrb = ManualProfile("PCI\\VEN_10EC&DEV_B852", "rtl8852be");
+        Check(mrb is { Backend: RadioBackendKind.Devourer, RadioFamily: null }, "manual rtl8852be profile");
         Check(ManualProfile("PCI\\VEN_10EC&DEV_C852", "qu") is null, "an Intel model accepted for a Realtek card");
         Check(ManualProfile("PCI\\VEN_8086&DEV_2723", "nope") is null, "an unknown model accepted");
         Check(ManualProfile("USB\\VID_0BDA&PID_8812", "rtl8852ce") is null, "a USB device accepted");

@@ -1,0 +1,132 @@
+# Fast RTL8852BE / RTL8852CE bring-up build & offline test workflow.
+# Builds only regproxy, nekodrop-radio-rtl.exe, pcieprobe.exe, and offline
+# unit/self-tests (skipping Intel/MT7902/Rust/MinGW/Inno Setup) so hardware
+# bring-up iterations finish in a few minutes.
+name: build-rtl-test
+on:
+  workflow_dispatch:
+  push:
+    branches: ['dev/RTL8852BE']
+permissions:
+  contents: read
+jobs:
+  rtl8852be-bringup:
+    runs-on: windows-2025
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+      - name: Fetch RTL dependencies (winawdl, devourer, WDK)
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $tp = Join-Path $PWD 'third_party'
+          New-Item -ItemType Directory -Force $tp | Out-Null
+
+          function Get-Repo($name, $url, $commit) {
+            $dir = Join-Path $tp $name
+            if (-not (Test-Path "$dir\.git")) {
+              git clone --quiet $url $dir
+              if ($LASTEXITCODE) { throw "clone $url failed" }
+            }
+            git -C $dir fetch --quiet origin
+            git -C $dir checkout --quiet $commit
+            if ($LASTEXITCODE) { throw "$name`: commit $commit not found" }
+            "$name @ $($commit.Substring(0, 7))"
+          }
+
+          Get-Repo winawdl https://github.com/raph559/winawdl.git 0db7031589dc2bca03c0893db341176376962047
+          Get-Repo 'winawdl\upstream\devourer' https://github.com/raph559/devourer.git 8d936de2a3805ce126e5236349afe40e645aaf9b
+
+          $kit = "${env:ProgramFiles(x86)}\Windows Kits\10"
+          if (-not (Test-Path "$kit\Include\wdf\umdf")) {
+            $wdk = Join-Path $tp 'wdk-nuget'
+            New-Item -ItemType Directory -Force $wdk | Out-Null
+            Invoke-WebRequest 'https://www.nuget.org/api/v2/package/Microsoft.Windows.WDK.x64/10.0.26100.6584' -OutFile "$wdk\wdk.nupkg" -UseBasicParsing
+            Copy-Item "$wdk\wdk.nupkg" "$wdk\wdk.zip"
+            Expand-Archive "$wdk\wdk.zip" "$wdk\wdk" -Force
+            Remove-Item "$wdk\wdk.zip"
+            'WDK 10.0.26100.6584 (NuGet)'
+          } else { 'WDK: installed' }
+
+      - name: Build and package regproxy driver
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          .\scripts\package-driver.ps1
+
+      - name: Build RTL radio, pcieprobe and run unit tests
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          .\scripts\build-radio-rtl.ps1
+          . .\scripts\toolchain.ps1
+          $tools = Initialize-Toolchain
+          & $tools.CMake --build build\rtlradio --target pcieprobe
+          if ($LASTEXITCODE -ne 0) { throw "pcieprobe build failed ($LASTEXITCODE)" }
+
+      - name: Service catalog and PowerShell 5.1 self-tests
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          dotnet build app\service\NekoDrop.Service.csproj -c Release -o build\service-test --nologo -v q
+          if ($LASTEXITCODE -ne 0) { throw 'service build failed' }
+          & build\service-test\NekoDropService.exe --selftest
+          if ($LASTEXITCODE -ne 0) { throw 'service self-test failed' }
+
+          foreach ($script in 'install.ps1', 'uninstall.ps1', 'setup-tap.ps1', 'restore.ps1', 'report.ps1') {
+            & powershell.exe -NoProfile -Command "`$e = `$null; [void][Management.Automation.Language.Parser]::ParseFile('$PWD\installer\$script', [ref]`$null, [ref]`$e); if (`$e) { `$e | ForEach-Object { `$_.ToString() }; exit 1 }"
+            if ($LASTEXITCODE -ne 0) { throw "$script does not parse" }
+          }
+          foreach ($script in 'install.ps1', 'uninstall.ps1', 'restore.ps1', 'report.ps1') {
+            & powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$PWD\installer\$script" -SelfTest
+            if ($LASTEXITCODE -ne 0) { throw "$script self-test failed ($LASTEXITCODE)" }
+          }
+
+      - name: Stage RTL8852BE bring-up kit
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          . .\scripts\toolchain.ps1
+          $tools = Initialize-Toolchain
+          $kit = Join-Path $PWD 'build\rtl8852be-kit'
+          New-Item -ItemType Directory -Force "$kit\driver" | Out-Null
+          Copy-Item driver\regproxy\build\package\* "$kit\driver\"
+          Copy-Item build\rtlradio\winawdl_radio.exe "$kit\nekodrop-radio-rtl.exe"
+          $probe = Get-ChildItem build\rtlradio -Recurse -Filter pcieprobe.exe | Select-Object -First 1
+          if (-not $probe) { throw 'pcieprobe.exe missing' }
+          Copy-Item $probe.FullName "$kit\pcieprobe.exe"
+          if ($tools.DevCon -and (Test-Path $tools.DevCon)) {
+            Copy-Item $tools.DevCon "$kit\devcon.exe"
+          }
+          Copy-Item installer\restore.ps1, installer\report.ps1 "$kit\"
+
+          @'
+          RTL8852BE Bring-Up Test Kit (nekodrop dev/RTL8852BE)
+          ====================================================
+          Keep wired Ethernet plugged in while testing!
+
+          1. Open an Administrator PowerShell in this folder.
+          2. Trust the temporary test signing cert and bind regproxy to 10EC:B852:
+               Import-Certificate -FilePath .\driver\winairdrop-signing.cer -CertStoreLocation Cert:\LocalMachine\Root
+               Import-Certificate -FilePath .\driver\winairdrop-signing.cer -CertStoreLocation Cert:\LocalMachine\TrustedPublisher
+               pnputil /add-driver .\driver\winawdl_regproxy.inf
+               .\devcon.exe update .\driver\winawdl_regproxy.inf "PCI\VEN_10EC&DEV_B852"
+          3. Run staged hardware bring-up (stop at the first failure and save output):
+               .\pcieprobe.exe win id
+               .\pcieprobe.exe win power
+               .\pcieprobe.exe win fw
+               .\pcieprobe.exe win bb
+          4. If all 4 stages pass, test the radio daemon (Ctrl+C to stop):
+               .\nekodrop-radio-rtl.exe 6 --width 20
+          5. Restore Windows Realtek Wi-Fi driver anytime (one-click):
+               powershell -ExecutionPolicy Bypass -File .\restore.ps1
+          '@ | Set-Content "$kit\README-TEST.txt" -Encoding ascii
+          Get-ChildItem $kit -Recurse | Select-Object FullName, Length
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: rtl8852be-bringup
+          path: build/rtl8852be-kit
+          if-no-files-found: error

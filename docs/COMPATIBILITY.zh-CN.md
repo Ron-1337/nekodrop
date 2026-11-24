@@ -39,8 +39,8 @@ nekodrop 在用户态直接驱动无线网卡芯片，使 Windows 原生运行�
 | 网卡 / 系列 | PCI Device ID | 支持模式 | 状态 |
 |---|---|---|---|
 | **Realtek RTL8852CE** | `C852` | 按需接管（原厂驱动照常连 Wi-Fi） | ⚠️ **已内置待实测**（原生内置 `nekodrop-radio-rtl.exe`，基于 [winawdl](https://github.com/raph559/winawdl)/`devourer` 完整 A-MPDU 后端；CI 已编译并通过离线单测，待在 nekodrop 内真机验证；Intel 默认行为 100% 不变） |
-| **Realtek RTL8852BE / RTL8851BE** | `B852` `B85B` `B851` | 按需接管 | 🚧 紧随 RTL8852CE 之后接入（基于 `OpenIPC/devourer` `KESTREL_8852B`） |
-| Realtek RTL8852AE / RTL8922AE | `8852` `8922` | 按需接管 | 🗓️ 规划中 |
+| **Realtek RTL8852BE** | `B852` `B85B` | 按需接管（原厂驱动照常连 Wi-Fi） | ⚠️ **已内置待真机验证**（在 `nekodrop-radio-rtl.exe` 内新增 8852BE PCIe 32-bit DMA 与单 BDRAM 通道支持，CI 已编译并通过离线单测，真机验证中） |
+| Realtek RTL8851BE / RTL8852AE / RTL8922AE | `B851` `8852` `8922` | 按需接管 | 🗓️ 规划中 |
 
 ---
 

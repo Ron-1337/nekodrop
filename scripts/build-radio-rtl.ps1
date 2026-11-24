@@ -18,9 +18,12 @@ if (-not (Test-Path (Join-Path $devourerSrc 'CMakeLists.txt'))) {
   throw "devourer sources missing at $devourerSrc`: run scripts\fetch-deps.ps1 first."
 }
 
-# nekodrop's change to the radio: it reports the phone's 5 GHz AWDL channel (#32).
+# nekodrop's changes to the radio: report the phone's 5 GHz AWDL channel (#32)
+# and enable RTL8852BE (10EC:B852 / 10EC:B85B) PCIe support in devourer.
 & python -I "$PSScriptRoot\patch-radio-rtl.py" $winawdl
 if ($LASTEXITCODE -ne 0) { throw 'RTL radio patch failed' }
+& python -I "$PSScriptRoot\patch-devourer-8852be.py" $winawdl
+if ($LASTEXITCODE -ne 0) { throw 'RTL8852BE devourer patch failed' }
 
 $vcpkgCandidates = New-Object System.Collections.Generic.List[string]
 foreach ($c in $env:VCPKG_ROOT, $env:VCPKG_INSTALLATION_ROOT, 'C:\vcpkg') {
