@@ -103,7 +103,10 @@ HELPER = NL.join([
 RX_OLD = '  if (packet.RxAtrib.crc_err) return;' + NL + '  note_station(frame, session);' + NL
 RX_NEW = NL.join([
     '  if (packet.RxAtrib.crc_err) return;',
-    '  if (const unsigned ch = nekodrop::peer_channel(frame);',
+    '  const auto awdl_frame = (packet.RxAtrib.fcs_present && frame.size() > 4)',
+    '                              ? frame.first(frame.size() - 4)',
+    '                              : frame;',
+    '  if (const unsigned ch = nekodrop::peer_channel(awdl_frame);',
     '      ch && ch != nekodrop::peer_channel_told) { /* nekodrop (#32) */',
     '    nekodrop::peer_channel_told = ch;',
     '    nekodrop::peer_channel_news = ch;',
@@ -116,15 +119,17 @@ LOOP_OLD = '    messages++;' + NL + '    untold++;' + NL
 LOOP_NEW = NL.join([
     '    messages++;',
     '    untold++;',
+    '    /* winawdl_radio lowers the logger to Warn while serving a client,',
+    '     * so these lines must be logged at warn level or they are dropped. */',
     '    if (nekodrop::peer_seq_ready.exchange(false, std::memory_order_acquire)) {',
     '      std::string s;',
     '      for (size_t n = 0; n < 16; ++n)',
     '        s += (n ? "," : "") + std::to_string(nekodrop::peer_seq_sample[n]);',
-    '      logger->info("radio: peer chanseq enc={} [{}] -> ch {}",',
+    '      logger->warn("radio: peer chanseq enc={} [{}] -> ch {}",',
     '                   nekodrop::peer_seq_enc, s, nekodrop::peer_seq_ch);',
     '    }',
     '    if (const unsigned ch = nekodrop::peer_channel_news.exchange(0)) /* nekodrop (#32) */',
-    '      logger->info("radio: event: peer-channel {}", ch);',
+    '      logger->warn("radio: event: peer-channel {}", ch);',
     '',
 ])
 
