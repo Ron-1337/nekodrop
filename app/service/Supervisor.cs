@@ -194,6 +194,10 @@ public sealed class Supervisor : IDisposable
         // Wi-Fi key: never leave one behind across a restart.
         try { File.Delete(Path.Combine(ServiceConfig.Folder, "run", "sta.conf")); } catch (Exception) { }
         SayHeader();
+        // Clean up any radio / awdld processes left behind if a previous service
+        // instance died without running Dispose(), before touching the driver or
+        // binding \\.\pipe\winawdl-radio.
+        KillDaemons();
         _ = Task.Run(SetTapMetric);
         if (KernelDriver) Start("boot (kernel driver: Windows keeps Wi-Fi)");
         else if (EffectiveMode() == NetMode.Concurrent) Start("boot (concurrent mode)");
@@ -918,7 +922,7 @@ public sealed class Supervisor : IDisposable
     /// <summary>Refreshes the list; `ssid` makes it a directed scan (hidden networks).</summary>
     public void WifiScan(string? ssid = null)
     {
-        if (State != RadioState.On) return;
+        if (State != RadioState.On || EffectiveMode() != NetMode.Concurrent) return;
         lock (_lock)
         {
             _scanPending = [];
@@ -1174,6 +1178,8 @@ public sealed class Supervisor : IDisposable
         return p;
     }
 
+    static readonly string[] DaemonProcessNames = ["awdld", "nekodrop-radio", "nekodrop-radio-rtl", "nekodrop-radio-mt"];
+
     void KillDaemons()
     {
         foreach (var p in new[] { _awdld, _radio })
@@ -1189,6 +1195,29 @@ public sealed class Supervisor : IDisposable
             catch (InvalidOperationException) { }
         }
         _awdld = _radio = null;
+        // Also reap any orphaned daemons from our install folder left behind by
+        // an earlier service crash, which would otherwise hold \\.\pipe\winawdl-radio.
+        var root = Path.GetFullPath(_root).TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar;
+        foreach (var name in DaemonProcessNames)
+        {
+            Process[] procs;
+            try { procs = Process.GetProcessesByName(name); }
+            catch (Exception) { continue; }
+            foreach (var p in procs)
+            {
+                using (p)
+                {
+                    try
+                    {
+                        var path = p.MainModule?.FileName;
+                        if (path is null || !path.StartsWith(root, StringComparison.OrdinalIgnoreCase)) continue;
+                        p.Kill();
+                        p.WaitForExit(5000);
+                    }
+                    catch (Exception) { }
+                }
+            }
+        }
     }
 
     public void Dispose()

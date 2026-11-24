@@ -31,7 +31,8 @@ public partial class WifiWindow : Window
             A.Service.Reply -= OnReply;
         };
         if (A.Service.Last is { } last) Render(last);
-        Scan();
+        var lastMode = (string?)A.Service.Last?["effectiveMode"] ?? (string?)A.Service.Last?["mode"] ?? "";
+        if (lastMode == "concurrent") Scan();
     }
 
     void OnState(JsonObject o) => Dispatcher.BeginInvoke(() => Render(o));
@@ -98,7 +99,7 @@ public partial class WifiWindow : Window
         var wifi = (string?)o["wifi"] ?? "";
         var ssid = (string?)o["ssid"] ?? "";
         var radio = (string?)o["radio"] ?? "";
-        var mode = (string?)o["mode"] ?? "";
+        var mode = (string?)o["effectiveMode"] ?? (string?)o["mode"] ?? "";
         var scanning = (bool?)o["scanning"] ?? false;
         var connected = wifi == "connected";
 

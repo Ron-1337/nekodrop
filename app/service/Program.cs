@@ -65,6 +65,17 @@ if (!System.Security.Principal.WindowsIdentity.GetCurrent().IsSystem)
     return;
 }
 
+AppDomain.CurrentDomain.UnhandledException += (_, e) =>
+{
+    try
+    {
+        var logPath = Path.Combine(ServiceConfig.Folder, "service.log");
+        File.AppendAllText(logPath,
+            $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} FATAL unhandled exception: {e.ExceptionObject}{Environment.NewLine}");
+    }
+    catch (Exception) { }
+};
+
 var builder = Host.CreateApplicationBuilder(args);
 builder.Services.AddWindowsService(o => o.ServiceName = "NekoDropService");
 builder.Services.AddSingleton<Supervisor>();
