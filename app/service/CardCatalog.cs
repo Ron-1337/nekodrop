@@ -300,7 +300,7 @@ public static class CardCatalog
             {
                 Check(Classify(beId) == rb, $"10EC:{dev} Classify and MatchActive disagree");
                 Check(rb.HardwareId == $"PCI\\VEN_10EC&DEV_{dev}", $"10EC:{dev} hardware ID {rb.HardwareId}");
-                Check(rb.VendorName == "Realtek" && rb.Family == "RTL8852BE" && rb.Backend == RadioBackendKind.Devourer,
+                Check(rb.VendorName == "Realtek" && rb.FamilyName == "RTL8852BE" && rb.Backend == RadioBackendKind.Devourer,
                       $"10EC:{dev} vendor/family/backend");
                 Check(EffectiveMode(NetMode.Concurrent, rb.Capabilities) == NetMode.OnDemand,
                       $"10EC:{dev} Concurrent not forced to OnDemand");
